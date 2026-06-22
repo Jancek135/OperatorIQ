@@ -1,15 +1,29 @@
-// =============================================================
-// Standlomat Intelligence — Business Logic
+﻿// =============================================================
+// Standlomat Intelligence â€” Business Logic
 // Ported 1:1 from standlomat_intelligence.html
 // All functions are pure (no side effects, no DOM)
 // =============================================================
 
 import type { Machine, Snapshot, FleetSettings, MachineStatus, Insight, Alert } from './types'
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// MONTH LABEL SORT HELPER
+// Converts "Feb 2026" / "Mär 2026" etc. to a numeric sort key (YYYYMM)
+// ─────────────────────────────────────────────────────────────────────────────
+const MONTH_ORDER: Record<string, number> = {
+  Jan:1, Feb:2, 'Mär':3, Apr:4, Mai:5, Jun:6,
+  Jul:7, Aug:8, Sep:9, Okt:10, Nov:11, Dez:12,
+}
+function monthLabelKey(label: string): number {
+  const [mon, year] = label.split(' ')
+  return (parseInt(year) || 0) * 100 + (MONTH_ORDER[mon] ?? 0)
+}
+
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // DYNAMIC REVENUE HELPERS
-// Override-Schicht: CSV-Import schlägt Baseline
-// ─────────────────────────────────────────────────────────────
+// Override-Schicht: CSV-Import schlÃ¤gt Baseline
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function getMRev(m: Machine): number {
   return m.rev_override ?? m.baseline_rev
@@ -40,9 +54,9 @@ export function getMWE(m: Machine, defaultWE: number): number {
   return m.we_rate_override ?? defaultWE
 }
 
-// ─────────────────────────────────────────────────────────────
-// STATUS — g(rün) / y(elb) / r(ot)
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// STATUS â€” g(rÃ¼n) / y(elb) / r(ot)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function status(m: Machine, machines: Machine[], settings: FleetSettings): MachineStatus {
   const we   = getMWE(m, settings.we_rate)
@@ -66,9 +80,9 @@ export function status(m: Machine, machines: Machine[], settings: FleetSettings)
   return 'y'
 }
 
-// ─────────────────────────────────────────────────────────────
-// SCORE (0–100) — für Ranking
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// SCORE (0â€“100) â€” fÃ¼r Ranking
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function calcScore(m: Machine, machines: Machine[], settings: FleetSettings): number {
   const avgRev = getAvgRev(machines)
@@ -81,9 +95,9 @@ export function calcScore(m: Machine, machines: Machine[], settings: FleetSettin
   return revS + bonS
 }
 
-// ─────────────────────────────────────────────────────────────
-// RECOMMENDATION — kurzer Handlungshinweis pro Maschine
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// RECOMMENDATION â€” kurzer Handlungshinweis pro Maschine
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function rec(m: Machine, machines: Machine[], settings: FleetSettings): string {
   const st     = status(m, machines, settings)
@@ -94,21 +108,21 @@ export function rec(m: Machine, machines: Machine[], settings: FleetSettings): s
   const avgRev = getAvgRev(machines)
 
   if (st === 'r') {
-    if (bon < avgBon * 0.65) return 'Sortiment prüfen — Bon weit unter Schnitt'
-    if (rev < avgRev * 0.3)  return 'Kritisch niedrig — Standort hinterfragen'
-    return 'Umsatz unter kritischer Schwelle — Sofortmaßnahme'
+    if (bon < avgBon * 0.65) return 'Sortiment prÃ¼fen â€” Bon weit unter Schnitt'
+    if (rev < avgRev * 0.3)  return 'Kritisch niedrig â€” Standort hinterfragen'
+    return 'Umsatz unter kritischer Schwelle â€” SofortmaÃŸnahme'
   }
   if (st === 'y') {
-    if (bon < avgBon)        return 'Sortiment optimieren für höheren Bon'
-    if (rev < avgRev)        return 'Frequenz steigern oder Standort überprüfen'
-    return 'Stabil — Potenzial noch nicht ausgeschöpft'
+    if (bon < avgBon)        return 'Sortiment optimieren fÃ¼r hÃ¶heren Bon'
+    if (rev < avgRev)        return 'Frequenz steigern oder Standort Ã¼berprÃ¼fen'
+    return 'Stabil â€” Potenzial noch nicht ausgeschÃ¶pft'
   }
-  return 'Top-Performer — Status halten'
+  return 'Top-Performer â€” Status halten'
 }
 
-// ─────────────────────────────────────────────────────────────
-// SPARKLINE DATA — Punkte für SVG (ältester → neuester → aktuell)
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// SPARKLINE DATA â€” Punkte fÃ¼r SVG (Ã¤ltester â†’ neuester â†’ aktuell)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface SparklineData {
   points: string       // SVG polyline points
@@ -124,7 +138,7 @@ export function sparklineData(
 ): SparklineData {
   const machineSnaps = snapshots
     .filter(s => s.machine_id === m.id)
-    .sort((a, b) => a.month_label.localeCompare(b.month_label))  // oldest first
+    .sort((a, b) => monthLabelKey(a.month_label) - monthLabelKey(b.month_label)) // oldest first
 
   const currentRev = getMRev(m)
 
@@ -160,9 +174,9 @@ export function sparklineData(
   return { points: pts, color: col, dotCx: cx, dotCy: cy, hasData: true }
 }
 
-// ─────────────────────────────────────────────────────────────
-// INSIGHTS — strategische Fleet-Beobachtungen
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// INSIGHTS â€” strategische Fleet-Beobachtungen
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function buildInsights(machines: Machine[], settings: FleetSettings): Insight[] {
   const insights: Insight[] = []
@@ -177,8 +191,8 @@ export function buildInsights(machines: Machine[], settings: FleetSettings): Ins
   const top3pct = fleetRev > 0 ? (top3rev / fleetRev) * 100 : 0
   if (top3pct > 55) {
     insights.push({
-      icon: '⚠️',
-      text: `Top-3 Maschinen erwirtschaften ${top3pct.toFixed(0)}% des Umsatzes — Klumpenrisiko`,
+      icon: 'âš ï¸',
+      text: `Top-3 Maschinen erwirtschaften ${top3pct.toFixed(0)}% des Umsatzes â€” Klumpenrisiko`,
       type: 'warning'
     })
   }
@@ -187,7 +201,7 @@ export function buildInsights(machines: Machine[], settings: FleetSettings): Ins
   const red = machines.filter(m => status(m, machines, settings) === 'r')
   if (red.length > 0) {
     insights.push({
-      icon: '🔴',
+      icon: 'ðŸ”´',
       text: `${red.length} Maschine${red.length > 1 ? 'n' : ''} unter kritischer Schwelle: ${red.map(m => m.name).join(', ')}`,
       type: 'warning'
     })
@@ -201,8 +215,8 @@ export function buildInsights(machines: Machine[], settings: FleetSettings): Ins
   const bestLoc = Object.entries(byLocation).sort((a, b) => b[1] - a[1])[0]
   if (bestLoc) {
     insights.push({
-      icon: '📍',
-      text: `Bester Standort: ${bestLoc[0]} mit €${bestLoc[1].toLocaleString('de-AT', { maximumFractionDigits: 0 })}`,
+      icon: 'ðŸ“',
+      text: `Bester Standort: ${bestLoc[0]} mit â‚¬${bestLoc[1].toLocaleString('de-AT', { maximumFractionDigits: 0 })}`,
       type: 'positive'
     })
   }
@@ -215,8 +229,8 @@ export function buildInsights(machines: Machine[], settings: FleetSettings): Ins
   })
   if (highBon.length > 0) {
     insights.push({
-      icon: '💡',
-      text: `${highBon.length} Maschine${highBon.length > 1 ? 'n' : ''} mit überdurchschnittlichem Bon — Sortiment als Vorbild nehmen`,
+      icon: 'ðŸ’¡',
+      text: `${highBon.length} Maschine${highBon.length > 1 ? 'n' : ''} mit Ã¼berdurchschnittlichem Bon â€” Sortiment als Vorbild nehmen`,
       type: 'positive'
     })
   }
@@ -226,18 +240,18 @@ export function buildInsights(machines: Machine[], settings: FleetSettings): Ins
   const weRate = settings.we_rate
   if (weRate > 0.3) {
     insights.push({
-      icon: '📦',
-      text: `Wareneinsatz ${(weRate * 100).toFixed(0)}% — über 30% drückt Marge erheblich`,
+      icon: 'ðŸ“¦',
+      text: `Wareneinsatz ${(weRate * 100).toFixed(0)}% â€” Ã¼ber 30% drÃ¼ckt Marge erheblich`,
       type: 'warning'
     })
   }
 
-  // Grüne Performer
+  // GrÃ¼ne Performer
   const green = machines.filter(m => status(m, machines, settings) === 'g')
   if (green.length > 0) {
     insights.push({
-      icon: '✅',
-      text: `${green.length} Maschine${green.length > 1 ? 'n' : ''} im grünen Bereich — Fleet-Anteil ${((green.length / machines.length) * 100).toFixed(0)}%`,
+      icon: 'âœ…',
+      text: `${green.length} Maschine${green.length > 1 ? 'n' : ''} im grÃ¼nen Bereich â€” Fleet-Anteil ${((green.length / machines.length) * 100).toFixed(0)}%`,
       type: 'positive'
     })
   }
@@ -245,9 +259,9 @@ export function buildInsights(machines: Machine[], settings: FleetSettings): Ins
   return insights.slice(0, 5)
 }
 
-// ─────────────────────────────────────────────────────────────
-// ALERTS — konkrete Warnungen pro Maschine
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ALERTS â€” konkrete Warnungen pro Maschine
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function buildAlerts(machines: Machine[], settings: FleetSettings): Alert[] {
   const alerts: Alert[] = []
@@ -264,28 +278,28 @@ export function buildAlerts(machines: Machine[], settings: FleetSettings): Alert
 
     if (fixCost > 0 && db1 < fixCost) {
       alerts.push({
-        icon: '🔴',
-        text: `DB1 (€${db1.toFixed(0)}) deckt Fixkosten (€${fixCost.toFixed(0)}) nicht`,
+        icon: 'ðŸ”´',
+        text: `DB1 (â‚¬${db1.toFixed(0)}) deckt Fixkosten (â‚¬${fixCost.toFixed(0)}) nicht`,
         machine: m.name,
         severity: 'r'
       })
     } else if (rev < avgRev * 0.45) {
       alerts.push({
-        icon: '🔴',
-        text: `Umsatz €${rev.toFixed(0)} — nur ${((rev / avgRev) * 100).toFixed(0)}% des Fleet-Schnitts`,
+        icon: 'ðŸ”´',
+        text: `Umsatz â‚¬${rev.toFixed(0)} â€” nur ${((rev / avgRev) * 100).toFixed(0)}% des Fleet-Schnitts`,
         machine: m.name,
         severity: 'r'
       })
     } else if (bon < avgBon * 0.65 && tx > 10) {
       alerts.push({
-        icon: '🟡',
-        text: `Bon €${bon.toFixed(2)} — ${((bon / avgBon) * 100).toFixed(0)}% des Schnitts`,
+        icon: 'ðŸŸ¡',
+        text: `Bon â‚¬${bon.toFixed(2)} â€” ${((bon / avgBon) * 100).toFixed(0)}% des Schnitts`,
         machine: m.name,
         severity: 'y'
       })
     } else if (rev < avgRev * 0.7) {
       alerts.push({
-        icon: '🟡',
+        icon: 'ðŸŸ¡',
         text: `Umsatz unter 70% des Fleet-Schnitts`,
         machine: m.name,
         severity: 'y'
@@ -296,9 +310,9 @@ export function buildAlerts(machines: Machine[], settings: FleetSettings): Alert
   return alerts.sort((a, b) => (a.severity === 'r' ? -1 : 1))
 }
 
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // PROFIT CALCULATION
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function calcProfit(machines: Machine[], settings: FleetSettings): number {
   const fleetRev = getFleetRev(machines)
@@ -307,9 +321,9 @@ export function calcProfit(machines: Machine[], settings: FleetSettings): number
   return fleetRev * (1 - we) - totalCosts
 }
 
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // CSV FUZZY MATCHING
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function tokenize(name: string): string[] {
   return name.toLowerCase().split(/[\s\-_\/\\]+/).filter(t => t.length > 2)
@@ -333,9 +347,9 @@ export function fuzzyMatch(csvName: string, machines: Machine[]): Machine | null
   return bestScore >= 1 ? best : null
 }
 
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // CSV PARSING
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface ParsedCSVRow {
   name: string
@@ -352,8 +366,8 @@ export function parseCSVText(text: string): ParsedCSVRow[] {
   const headers = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/["']/g, ''))
 
   // Find column indices
-  const nameIdx = headers.findIndex(h => h.includes('name') || h.includes('bezeichnung') || h.includes('maschine') || h.includes('gerät'))
-  const revIdx  = headers.findIndex(h => h.includes('umsatz') || h.includes('revenue') || h.includes('betrag') || h.includes('summe') || h.includes('erlös'))
+  const nameIdx = headers.findIndex(h => h.includes('name') || h.includes('bezeichnung') || h.includes('maschine') || h.includes('gerÃ¤t'))
+  const revIdx  = headers.findIndex(h => h.includes('umsatz') || h.includes('revenue') || h.includes('betrag') || h.includes('summe') || h.includes('erlÃ¶s'))
   const txIdx   = headers.findIndex(h => h.includes('transaktion') || h.includes('verkauf') || h.includes('anzahl') || h.includes('count') || h.includes('vend'))
 
   if (nameIdx < 0 || revIdx < 0) return []
@@ -367,9 +381,9 @@ export function parseCSVText(text: string): ParsedCSVRow[] {
   }).filter(r => r.name && r.rev > 0)
 }
 
-// ─────────────────────────────────────────────────────────────
-// AI INSIGHTS — specific, data-driven, actionable
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// AI INSIGHTS â€” specific, data-driven, actionable
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type AIInsightType = 'opportunity' | 'warning' | 'critical' | 'positive'
 
@@ -379,7 +393,7 @@ export interface AIInsight {
   title: string
   detail: string
   action: string
-  potential: number | null   // €/Monat, positive = gain
+  potential: number | null   // â‚¬/Monat, positive = gain
   machine?: string
 }
 
@@ -400,9 +414,9 @@ export function buildAIInsights(machines: Machine[], settings: FleetSettings): A
     const potential = Math.round((avgRev - worstRev) * (1 - we))
     insights.push({
       type: 'critical',
-      icon: '📍',
+      icon: 'ðŸ“',
       title: `${worst.name} liegt ${worstPct.toFixed(0)}% unter dem Durchschnitt`,
-      detail: `Umsatz: € ${worstRev.toLocaleString('de-AT', { maximumFractionDigits: 0 })} vs. Fleet-Schnitt € ${avgRev.toLocaleString('de-AT', { maximumFractionDigits: 0 })}. Standort oder Sortiment überprüfen.`,
+      detail: `Umsatz: â‚¬ ${worstRev.toLocaleString('de-AT', { maximumFractionDigits: 0 })} vs. Fleet-Schnitt â‚¬ ${avgRev.toLocaleString('de-AT', { maximumFractionDigits: 0 })}. Standort oder Sortiment Ã¼berprÃ¼fen.`,
       action: 'Standort analysieren oder Maschine versetzen',
       potential,
       machine: worst.name,
@@ -420,16 +434,16 @@ export function buildAIInsights(machines: Machine[], settings: FleetSettings): A
     const potential = Math.round(tx * bonGap * (1 - we))
     insights.push({
       type: 'opportunity',
-      icon: '🛒',
+      icon: 'ðŸ›’',
       title: `${lowBon.name}: Bon ${((bon / avgBon) * 100).toFixed(0)}% unter Schnitt`,
-      detail: `Ø Bon € ${bon.toFixed(2)} vs. Fleet-Schnitt € ${avgBon.toFixed(2)}. ${tx} Transaktionen/Monat — kleines Sortiment-Update wirkt sofort.`,
-      action: 'Sortiment anpassen — hochmargige Artikel hinzufügen',
+      detail: `Ã˜ Bon â‚¬ ${bon.toFixed(2)} vs. Fleet-Schnitt â‚¬ ${avgBon.toFixed(2)}. ${tx} Transaktionen/Monat â€” kleines Sortiment-Update wirkt sofort.`,
+      action: 'Sortiment anpassen â€” hochmargige Artikel hinzufÃ¼gen',
       potential,
       machine: lowBon.name,
     })
   }
 
-  // 3. Top performer — best location
+  // 3. Top performer â€” best location
   const byLocation: Record<string, number> = {}
   machines.forEach(m => { byLocation[m.standort] = (byLocation[m.standort] ?? 0) + getMRev(m) })
   const topLoc = Object.entries(byLocation).sort((a, b) => b[1] - a[1])[0]
@@ -438,10 +452,10 @@ export function buildAIInsights(machines: Machine[], settings: FleetSettings): A
     const locMachines = machines.filter(m => m.standort === topLoc[0])
     insights.push({
       type: 'positive',
-      icon: '⭐',
-      title: `${topLoc[0]} ist dein stärkster Standort`,
-      detail: `${share.toFixed(0)}% der Fleet-Revenue mit ${locMachines.length} Maschine${locMachines.length > 1 ? 'n' : ''}. Dieses Standort-Modell auf neue Locations übertragen.`,
-      action: 'Erfolgsformel auf ähnliche Standorte replizieren',
+      icon: 'â­',
+      title: `${topLoc[0]} ist dein stÃ¤rkster Standort`,
+      detail: `${share.toFixed(0)}% der Fleet-Revenue mit ${locMachines.length} Maschine${locMachines.length > 1 ? 'n' : ''}. Dieses Standort-Modell auf neue Locations Ã¼bertragen.`,
+      action: 'Erfolgsformel auf Ã¤hnliche Standorte replizieren',
       potential: null,
     })
   }
@@ -451,9 +465,9 @@ export function buildAIInsights(machines: Machine[], settings: FleetSettings): A
     const potentialWE = Math.round(fleetRev * (we - 0.28))
     insights.push({
       type: 'opportunity',
-      icon: '📦',
-      title: `WE ${(we * 100).toFixed(0)}% — Einkauf optimierbar`,
-      detail: `Reduktion auf 28% würde den Monatsproffit um ca. € ${potentialWE.toLocaleString('de-AT', { maximumFractionDigits: 0 })} steigern. Lieferantenverhandlung oder Produktmix anpassen.`,
+      icon: 'ðŸ“¦',
+      title: `WE ${(we * 100).toFixed(0)}% â€” Einkauf optimierbar`,
+      detail: `Reduktion auf 28% wÃ¼rde den Monatsproffit um ca. â‚¬ ${potentialWE.toLocaleString('de-AT', { maximumFractionDigits: 0 })} steigern. Lieferantenverhandlung oder Produktmix anpassen.`,
       action: 'WE-Satz auf 28% verhandeln',
       potential: potentialWE,
     })
@@ -465,24 +479,24 @@ export function buildAIInsights(machines: Machine[], settings: FleetSettings): A
   if (concentration > 60 && machines.length >= 5) {
     insights.push({
       type: 'warning',
-      icon: '⚠️',
+      icon: 'âš ï¸',
       title: `Klumpenrisiko: Top 3 = ${concentration.toFixed(0)}% des Umsatzes`,
-      detail: `${sorted[0].name}, ${sorted[1]?.name ?? ''} und ${sorted[2]?.name ?? ''} tragen ${concentration.toFixed(0)}% der Fleet-Revenue. Ausfall einer Maschine würde stark schmerzen.`,
-      action: 'Fleet diversifizieren — neue Standorte erschließen',
+      detail: `${sorted[0].name}, ${sorted[1]?.name ?? ''} und ${sorted[2]?.name ?? ''} tragen ${concentration.toFixed(0)}% der Fleet-Revenue. Ausfall einer Maschine wÃ¼rde stark schmerzen.`,
+      action: 'Fleet diversifizieren â€” neue Standorte erschlieÃŸen',
       potential: null,
     })
   }
 
-  // 6. Best machine vs worst — replacement signal
+  // 6. Best machine vs worst â€” replacement signal
   const best = sorted[0]
   if (best && worst && getMRev(best) > getMRev(worst) * 5) {
     const potential = Math.round((getMRev(best) * 0.5 - getMRev(worst)) * (1 - we))
     if (potential > 200) {
       insights.push({
         type: 'opportunity',
-        icon: '🔄',
-        title: `${worst.name} könnte ersetzt werden`,
-        detail: `Ertrag ${(getMRev(worst) / getMRev(best) * 100).toFixed(0)}% von ${best.name}. Versetzung an einen besseren Standort oder Ausstausch gegen stärkeres Modell.`,
+        icon: 'ðŸ”„',
+        title: `${worst.name} kÃ¶nnte ersetzt werden`,
+        detail: `Ertrag ${(getMRev(worst) / getMRev(best) * 100).toFixed(0)}% von ${best.name}. Versetzung an einen besseren Standort oder Ausstausch gegen stÃ¤rkeres Modell.`,
         action: 'Maschine versetzen oder gegen Top-Modell tauschen',
         potential,
         machine: worst.name,
@@ -493,9 +507,9 @@ export function buildAIInsights(machines: Machine[], settings: FleetSettings): A
   return insights.slice(0, 5)
 }
 
-// ─────────────────────────────────────────────────────────────
-// FLEET HEALTH SCORE (0–100)
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// FLEET HEALTH SCORE (0â€“100)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function calcFleetHealth(machines: Machine[], settings: FleetSettings): number {
   if (machines.length === 0) return 0
@@ -522,7 +536,7 @@ export function calcAIScore(machines: Machine[], snapshots: Snapshot[], settings
 export function calcMachineTrend(m: Machine, snapshots: Snapshot[]): { rev: number | null; tx: number | null } {
   const machineSnaps = snapshots
     .filter(s => s.machine_id === m.id)
-    .sort((a, b) => b.month_label.localeCompare(a.month_label))
+    .sort((a, b) => monthLabelKey(b.month_label) - monthLabelKey(a.month_label))
   if (machineSnaps.length === 0) return { rev: null, tx: null }
   const prev = machineSnaps[0]
   const currRev = getMRev(m)
@@ -536,7 +550,7 @@ export function calcMachineTrend(m: Machine, snapshots: Snapshot[]): { rev: numb
 // Returns relative change vs. latest snapshot month (null if no snapshots)
 export function calcFleetTrend(machines: Machine[], snapshots: Snapshot[]): number | null {
   if (snapshots.length === 0) return null
-  const labels = [...new Set(snapshots.map(s => s.month_label))].sort()
+  const labels = [...new Set(snapshots.map(s => s.month_label))].sort((a, b) => monthLabelKey(a) - monthLabelKey(b))
   const lastLabel = labels[labels.length - 1]
   const lastRev = snapshots.filter(s => s.month_label === lastLabel).reduce((sum, s) => sum + s.rev, 0)
   if (lastRev === 0) return null
@@ -545,7 +559,7 @@ export function calcFleetTrend(machines: Machine[], snapshots: Snapshot[]): numb
 
 export function calcProfitTrend(machines: Machine[], snapshots: Snapshot[], settings: FleetSettings): number | null {
   if (snapshots.length === 0) return null
-  const labels = [...new Set(snapshots.map(s => s.month_label))].sort()
+  const labels = [...new Set(snapshots.map(s => s.month_label))].sort((a, b) => monthLabelKey(a) - monthLabelKey(b))
   const lastLabel = labels[labels.length - 1]
   const lastRev = snapshots.filter(s => s.month_label === lastLabel).reduce((sum, s) => sum + s.rev, 0)
   const lastProfit = lastRev * (1 - settings.we_rate) - (settings.total_fix + settings.variable_costs)
@@ -554,18 +568,21 @@ export function calcProfitTrend(machines: Machine[], snapshots: Snapshot[], sett
   return (currProfit - lastProfit) / Math.abs(lastProfit)
 }
 
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // FORMATTING HELPERS
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function fmtEur(n: number): string {
-  return '€ ' + n.toLocaleString('de-AT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+  return 'â‚¬â€¯' + n.toLocaleString('de-AT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
 export function fmtEur2(n: number): string {
-  return '€ ' + n.toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return 'â‚¬â€¯' + n.toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 export function fmtPct(n: number): string {
   return (n * 100).toFixed(1) + '%'
 }
+
+
+
