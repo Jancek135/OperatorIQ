@@ -536,7 +536,9 @@ export function calcMachineTrend(m: Machine, snapshots: Snapshot[]): { rev: numb
     .filter(s => s.machine_id === m.id)
     .sort((a, b) => monthLabelKey(b.month_label) - monthLabelKey(a.month_label))
   if (machineSnaps.length === 0) return { rev: null, tx: null }
-  const prev = machineSnaps[0]
+  // 2nd newest = prev month (baseline_rev already reflects newest snapshot)
+  const snapIdx = (m.rev_override != null) ? 0 : 1
+  const prev = machineSnaps[snapIdx] ?? machineSnaps[0]
   const currRev = getMRev(m)
   const currTx  = getMTx(m)
   return {
@@ -549,18 +551,20 @@ export function calcMachineTrend(m: Machine, snapshots: Snapshot[]): { rev: numb
 export function calcFleetTrend(machines: Machine[], snapshots: Snapshot[]): number | null {
   if (snapshots.length === 0) return null
   const labels = [...new Set(snapshots.map(s => s.month_label))].sort((a, b) => monthLabelKey(a) - monthLabelKey(b))
-  const lastLabel = labels[labels.length - 1]
-  const lastRev = snapshots.filter(s => s.month_label === lastLabel).reduce((sum, s) => sum + s.rev, 0)
-  if (lastRev === 0) return null
-  return (getFleetRev(machines) - lastRev) / lastRev
+  if (labels.length < 2) return null
+  const prevLabel = labels[labels.length - 2]   // Apr = prev; Mai = baseline_rev = current
+  const prevRev = snapshots.filter(s => s.month_label === prevLabel).reduce((sum, s) => sum + s.rev, 0)
+  if (prevRev === 0) return null
+  return (getFleetRev(machines) - prevRev) / prevRev
 }
 
 export function calcProfitTrend(machines: Machine[], snapshots: Snapshot[], settings: FleetSettings): number | null {
   if (snapshots.length === 0) return null
   const labels = [...new Set(snapshots.map(s => s.month_label))].sort((a, b) => monthLabelKey(a) - monthLabelKey(b))
-  const lastLabel = labels[labels.length - 1]
-  const lastRev = snapshots.filter(s => s.month_label === lastLabel).reduce((sum, s) => sum + s.rev, 0)
-  const lastProfit = lastRev * (1 - settings.we_rate) - (settings.total_fix + settings.variable_costs)
+  if (labels.length < 2) return null
+  const prevLabel = labels[labels.length - 2]   // Apr = prev; Mai = baseline_rev = current
+  const prevRev = snapshots.filter(s => s.month_label === prevLabel).reduce((sum, s) => sum + s.rev, 0)
+  const lastProfit = prevRev * (1 - settings.we_rate) - (settings.total_fix + settings.variable_costs)
   const currProfit = calcProfit(machines, settings)
   if (lastProfit === 0) return null
   return (currProfit - lastProfit) / Math.abs(lastProfit)
