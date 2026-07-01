@@ -8,19 +8,19 @@ export interface Database {
   public: {
     Tables: {
       accounts: {
-        Row: { id: string; name: string; slug: string | null; logo_url: string | null; primary_color: string | null; plan: string; created_at: string }
-        Insert: { id?: string; name: string; slug?: string | null; logo_url?: string | null; primary_color?: string | null; plan?: string }
-        Update: { id?: string; name?: string; slug?: string | null; logo_url?: string | null; primary_color?: string | null; plan?: string }
+        Row: { id: string; name: string; slug: string | null; logo_url: string | null; primary_color: string | null; plan: string; industry: string | null; created_at: string }
+        Insert: { id?: string; name: string; slug?: string | null; logo_url?: string | null; primary_color?: string | null; plan?: string; industry?: string | null }
+        Update: { id?: string; name?: string; slug?: string | null; logo_url?: string | null; primary_color?: string | null; plan?: string; industry?: string | null }
       }
       profiles: {
-        Row: { id: string; account_id: string; full_name: string | null; role: string; created_at: string }
-        Insert: { id: string; account_id: string; full_name?: string | null; role?: string; created_at?: string }
-        Update: { id?: string; account_id?: string; full_name?: string | null; role?: string; created_at?: string }
+        Row: { id: string; account_id: string; full_name: string | null; role: string; onboarding_completed: boolean; created_at: string }
+        Insert: { id: string; account_id: string; full_name?: string | null; role?: string; onboarding_completed?: boolean; created_at?: string }
+        Update: { id?: string; account_id?: string; full_name?: string | null; role?: string; onboarding_completed?: boolean; created_at?: string }
       }
       locations: {
-        Row: { id: string; account_id: string; name: string; adresse: string | null; plz: string | null; ort: string | null; ansprechpartner: string | null; telefon: string | null; miete: number; notizen: string | null; created_at: string }
-        Insert: { id?: string; account_id: string; name: string; adresse?: string | null; plz?: string | null; ort?: string | null; ansprechpartner?: string | null; telefon?: string | null; miete?: number; notizen?: string | null }
-        Update: { id?: string; account_id?: string; name?: string; adresse?: string | null; plz?: string | null; ort?: string | null; ansprechpartner?: string | null; telefon?: string | null; miete?: number; notizen?: string | null }
+        Row: { id: string; account_id: string; name: string; adresse: string | null; plz: string | null; ort: string | null; ansprechpartner: string | null; telefon: string | null; miete: number; nebenkosten: number; vertrag_bis: string | null; fix_items: Json; notizen: string | null; created_at: string }
+        Insert: { id?: string; account_id: string; name: string; adresse?: string | null; plz?: string | null; ort?: string | null; ansprechpartner?: string | null; telefon?: string | null; miete?: number; nebenkosten?: number; vertrag_bis?: string | null; fix_items?: Json; notizen?: string | null }
+        Update: { id?: string; account_id?: string; name?: string; adresse?: string | null; plz?: string | null; ort?: string | null; ansprechpartner?: string | null; telefon?: string | null; miete?: number; nebenkosten?: number; vertrag_bis?: string | null; fix_items?: Json; notizen?: string | null }
       }
       machines: {
         Row: { id: string; account_id: string; location_id: string | null; name: string; standort: string; miete: number; baseline_rev: number; baseline_tx: number; sort_order: number; created_at: string }
@@ -43,9 +43,9 @@ export interface Database {
         Update: { id?: string; account_id?: string; machine_id?: string; month_label?: string; rev?: number; tx?: number }
       }
       fleet_settings: {
-        Row: { id: string; account_id: string; we_rate: number; total_fix: number; variable_costs: number; updated_at: string }
-        Insert: { id?: string; account_id: string; we_rate?: number; total_fix?: number; variable_costs?: number }
-        Update: { id?: string; account_id?: string; we_rate?: number; total_fix?: number; variable_costs?: number }
+        Row: { id: string; account_id: string; we_rate: number; total_fix: number; variable_costs: number; cost_items: Json; revenue_items: Json; updated_at: string }
+        Insert: { id?: string; account_id: string; we_rate?: number; total_fix?: number; variable_costs?: number; cost_items?: Json; revenue_items?: Json }
+        Update: { id?: string; account_id?: string; we_rate?: number; total_fix?: number; variable_costs?: number; cost_items?: Json; revenue_items?: Json }
       }
       we_overrides: {
         Row: { id: string; machine_id: string; we_rate: number; updated_at: string }
@@ -58,9 +58,24 @@ export interface Database {
         Update: { id?: string; account_id?: string; name?: string; kontakt?: string | null; telefon?: string | null; email?: string | null; notizen?: string | null }
       }
       catalog_products: {
-        Row: { id: string; account_id: string; supplier_id: string | null; name: string; barcode: string | null; kategorie: string | null; emoji: string | null; image_url: string | null; ek: number; vk: number; mwst_satz: number; mindestbestand: number; einheit: string; sort_order: number; aktiv: boolean; created_at: string }
-        Insert: { id?: string; account_id: string; supplier_id?: string | null; name: string; barcode?: string | null; kategorie?: string | null; emoji?: string | null; image_url?: string | null; ek: number; vk: number; mwst_satz?: number; mindestbestand?: number; einheit?: string; sort_order?: number; aktiv?: boolean }
-        Update: { id?: string; account_id?: string; supplier_id?: string | null; name?: string; barcode?: string | null; kategorie?: string | null; emoji?: string | null; image_url?: string | null; ek?: number; vk?: number; mwst_satz?: number; mindestbestand?: number; einheit?: string; sort_order?: number; aktiv?: boolean }
+        Row: { id: string; account_id: string; supplier_id: string | null; name: string; barcode: string | null; kategorie: string | null; emoji: string | null; image_url: string | null; ek: number; vk: number; mwst_satz: number; mindestbestand: number; einheit: string; sort_order: number; aktiv: boolean; pfand: number; gewicht_g: number | null; created_at: string }
+        Insert: { id?: string; account_id: string; supplier_id?: string | null; name: string; barcode?: string | null; kategorie?: string | null; emoji?: string | null; image_url?: string | null; ek: number; vk: number; mwst_satz?: number; mindestbestand?: number; einheit?: string; sort_order?: number; aktiv?: boolean; pfand?: number; gewicht_g?: number | null }
+        Update: { id?: string; account_id?: string; supplier_id?: string | null; name?: string; barcode?: string | null; kategorie?: string | null; emoji?: string | null; image_url?: string | null; ek?: number; vk?: number; mwst_satz?: number; mindestbestand?: number; einheit?: string; sort_order?: number; aktiv?: boolean; pfand?: number; gewicht_g?: number | null }
+      }
+      stock_levels: {
+        Row: { id: string; account_id: string; product_id: string; current_qty: number; target_qty: number; avg_monthly_consumption: number; letzte_bewegung: string | null; lager_position: string | null; updated_at: string }
+        Insert: { id?: string; account_id: string; product_id: string; current_qty?: number; target_qty?: number; avg_monthly_consumption?: number; letzte_bewegung?: string | null; lager_position?: string | null }
+        Update: { id?: string; account_id?: string; product_id?: string; current_qty?: number; target_qty?: number; avg_monthly_consumption?: number; letzte_bewegung?: string | null; lager_position?: string | null }
+      }
+      expenses: {
+        Row: { id: string; account_id: string; name: string; betrag: number; mwst_satz: number; datum: string; kategorie: string | null; notizen: string | null; created_at: string }
+        Insert: { id?: string; account_id: string; name: string; betrag: number; mwst_satz?: number; datum?: string; kategorie?: string | null; notizen?: string | null }
+        Update: { id?: string; account_id?: string; name?: string; betrag?: number; mwst_satz?: number; datum?: string; kategorie?: string | null; notizen?: string | null }
+      }
+      refill_items: {
+        Row: { id: string; account_id: string; location_id: string; product_id: string; menge: number; erledigt: boolean; notiz: string | null; created_at: string }
+        Insert: { id?: string; account_id: string; location_id: string; product_id: string; menge?: number; erledigt?: boolean; notiz?: string | null }
+        Update: { id?: string; account_id?: string; location_id?: string; product_id?: string; menge?: number; erledigt?: boolean; notiz?: string | null }
       }
     }
   }
@@ -82,6 +97,7 @@ export interface Location {
   miete: number
   nebenkosten?: number
   vertrag_bis?: string | null  // ISO date string YYYY-MM-DD
+  fix_items?: Array<{ label: string; betrag: number }>
   notizen?: string | null
 }
 
@@ -102,6 +118,8 @@ export interface StockLevel {
   current_qty: number
   target_qty: number
   avg_monthly_consumption: number
+  letzte_bewegung?: string | null
+  lager_position?: string | null
   updated_at: string
 }
 
@@ -121,8 +139,23 @@ export interface CatalogProduct {
   einheit: string
   sort_order: number
   aktiv: boolean
+  pfand?: number
+  gewicht_g?: number | null
   // Joined
   supplier?: Supplier
+}
+
+export interface RefillItem {
+  id: string
+  account_id: string
+  location_id: string
+  product_id: string
+  menge: number
+  erledigt: boolean
+  notiz?: string | null
+  created_at: string
+  // Joined
+  product?: CatalogProduct
 }
 
 export interface Machine {
@@ -154,6 +187,7 @@ export interface FleetSettings {
   we_rate: number
   total_fix: number
   variable_costs: number
+  revenue_items?: Array<{ label: string; betrag: number }>
 }
 
 export interface FleetData {
@@ -161,6 +195,18 @@ export interface FleetData {
   snapshots: Snapshot[]
   settings: FleetSettings
   accountName: string
+}
+
+export interface Expense {
+  id: string
+  account_id: string
+  name: string
+  betrag: number
+  mwst_satz: number
+  datum: string
+  kategorie?: string | null
+  notizen?: string | null
+  created_at: string
 }
 
 // CSV import

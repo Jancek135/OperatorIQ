@@ -27,7 +27,7 @@ export async function middleware(request: NextRequest) {
   const isDashboard  = path.startsWith('/dashboard') || path.startsWith('/machines') ||
                        path.startsWith('/locations') || path.startsWith('/lager') ||
                        path.startsWith('/briefing')  || path.startsWith('/simulator') ||
-                       path.startsWith('/settings')
+                       path.startsWith('/settings')  || path.startsWith('/befuellplan')
   const isOnboarding = path.startsWith('/onboarding')
   const isAuth       = path.startsWith('/login') || path.startsWith('/register')
   const isRoot       = path === '/'

@@ -6,17 +6,18 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Cpu, MapPin, Settings, Bell,
-  LogOut, ChevronRight, SlidersHorizontal, Menu, X, Newspaper, Boxes,
+  LogOut, ChevronRight, SlidersHorizontal, Menu, X, Newspaper, Boxes, Truck,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { href: '/dashboard',  label: 'Dashboard',      Icon: LayoutDashboard },
-  { href: '/briefing',   label: 'Daily Briefing', Icon: Newspaper },
-  { href: '/machines',   label: 'Maschinen',      Icon: Cpu },
-  { href: '/locations',  label: 'Standorte',      Icon: MapPin },
-  { href: '/lager',      label: 'Lager',          Icon: Boxes },
-  { href: '/simulator',  label: 'Simulator',      Icon: SlidersHorizontal },
-  { href: '/settings',   label: 'Einstellungen',  Icon: Settings },
+  { href: '/dashboard',    label: 'Dashboard',      Icon: LayoutDashboard },
+  { href: '/briefing',     label: 'Daily Briefing', Icon: Newspaper },
+  { href: '/machines',     label: 'Maschinen',      Icon: Cpu },
+  { href: '/locations',    label: 'Standorte',      Icon: MapPin },
+  { href: '/lager',        label: 'Lager',          Icon: Boxes },
+  { href: '/befuellplan',  label: 'Befüllplan',     Icon: Truck },
+  { href: '/simulator',    label: 'Simulator',      Icon: SlidersHorizontal },
+  { href: '/settings',     label: 'Einstellungen',  Icon: Settings },
 ]
 
 interface NavClientProps {
