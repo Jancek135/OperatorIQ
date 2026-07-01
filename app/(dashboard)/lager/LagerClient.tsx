@@ -7,7 +7,7 @@ import type { CatalogProduct, Supplier, StockLevel } from '@/lib/types'
 import {
   Package, AlertTriangle, TrendingUp, ShoppingCart,
   Filter, ChevronUp, ChevronDown, X, Plus, Pencil,
-  Boxes, Trash2, Check, Clock, Brain, RefreshCw,
+  Boxes, Trash2, Check, Clock, Brain, RefreshCw, PackagePlus, FileDown,
 } from 'lucide-react'
 
 type ProductWithStock = CatalogProduct & { stock: StockLevel | null; supplier?: Supplier }
@@ -62,7 +62,7 @@ type SortDir = 'asc' | 'desc'
 const EMPTY_FORM = {
   name: '', kategorie: '', emoji: '', ek: '', vk: '',
   mwst_satz: '0.20', mindestbestand: '0', einheit: 'Stk',
-  supplier_id: '', barcode: '',
+  supplier_id: '', barcode: '', avg_monthly_consumption: '0',
 }
 
 // ── KPI Card ──────────────────────────────────────────────────────
@@ -112,6 +112,9 @@ export default function LagerClient({ products: initialProducts, suppliers, acco
   const [orderQty, setOrderQty]     = useState<Record<string, number>>(() =>
     Object.fromEntries(initialProducts.map(p => [p.id, suggestedOrderQty(p)]))
   )
+  const [wareneingangFor, setWareneingangFor] = useState<string | null>(null)
+  const [wareneingangQty, setWareneingangQty] = useState('')
+  const [wareneingangBusy, setWareneingangBusy] = useState(false)
 
   const kategorien = ['Alle', ...Array.from(new Set(products.map(p => p.kategorie).filter(Boolean) as string[]))]
 
@@ -120,9 +123,14 @@ export default function LagerClient({ products: initialProducts, suppliers, acco
   const toOrder      = products.filter(p => getStatus(p) === 'order')
   const lowStock     = products.filter(p => getStatus(p) === 'low')
   const lagerwert    = withStock.reduce((s, p) => s + p.ek * (p.stock?.current_qty ?? 0), 0)
-  const avgMarge     = products.length > 0
-    ? products.reduce((s, p) => s + (p.vk > 0 ? (p.vk - p.ek) / p.vk * 100 : 0), 0) / products.length
-    : 0
+
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
+  const toteKapitalProdukte = products.filter(p => {
+    if (!p.stock || (p.stock.current_qty ?? 0) <= 0) return false
+    if (!p.stock.letzte_bewegung) return true
+    return new Date(p.stock.letzte_bewegung).getTime() < Date.now() - THIRTY_DAYS_MS
+  })
+  const toteKapitalWert = toteKapitalProdukte.reduce((s, p) => s + p.ek * (p.stock?.current_qty ?? 0), 0)
 
   // ── Filter + Sort ──
   const filtered = products
@@ -177,6 +185,7 @@ export default function LagerClient({ products: initialProducts, suppliers, acco
       ek: String(p.ek), vk: String(p.vk), mwst_satz: String(p.mwst_satz),
       mindestbestand: String(p.mindestbestand), einheit: p.einheit,
       supplier_id: p.supplier_id ?? '', barcode: p.barcode ?? '',
+      avg_monthly_consumption: String(p.stock?.avg_monthly_consumption ?? 0),
     })
     setEditId(p.id); setShowForm(true)
   }
@@ -194,13 +203,35 @@ export default function LagerClient({ products: initialProducts, suppliers, acco
       einheit: form.einheit || 'Stk',
       supplier_id: form.supplier_id || null, barcode: form.barcode || null,
     }
+    const avgConsumption = parseInt(form.avg_monthly_consumption) || 0
+    let productId = editId
+
     if (editId) {
       const { data } = await supabase.from('catalog_products').update(payload).eq('id', editId).select().single()
       if (data) setProducts(ps => ps.map(p => p.id === editId ? { ...p, ...data, supplier: suppliers.find(s => s.id === data.supplier_id) } : p))
     } else {
       const { data } = await supabase.from('catalog_products').insert(payload).select().single()
-      if (data) setProducts(ps => [...ps, { ...data, stock: null, supplier: suppliers.find(s => s.id === data.supplier_id) }])
+      if (data) {
+        productId = data.id
+        setProducts(ps => [...ps, { ...data, stock: null, supplier: suppliers.find(s => s.id === data.supplier_id) }])
+      }
     }
+
+    if (productId) {
+      const { data: stockData } = await supabase
+        .from('stock_levels')
+        .upsert({
+          account_id: accountId,
+          product_id: productId,
+          avg_monthly_consumption: avgConsumption,
+        }, { onConflict: 'account_id,product_id' })
+        .select()
+        .single()
+      if (stockData) {
+        setProducts(ps => ps.map(p => p.id === productId ? { ...p, stock: stockData as StockLevel } : p))
+      }
+    }
+
     setSaving(false); setShowForm(false); setEditId(null)
   }
 
@@ -212,6 +243,34 @@ export default function LagerClient({ products: initialProducts, suppliers, acco
     setDeleting(null)
   }
 
+  // ── Wareneingang buchen ──
+  async function bookWareneingang(productId: string) {
+    const menge = parseInt(wareneingangQty) || 0
+    if (menge <= 0) return
+    setWareneingangBusy(true)
+    const product = products.find(p => p.id === productId)
+    const newQty = (product?.stock?.current_qty ?? 0) + menge
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('stock_levels')
+      .upsert({
+        account_id:      accountId,
+        product_id:      productId,
+        current_qty:     newQty,
+        target_qty:      product?.stock?.target_qty ?? product?.mindestbestand ?? 0,
+        letzte_bewegung: new Date().toISOString(),
+      }, { onConflict: 'account_id,product_id' })
+      .select()
+      .single()
+
+    if (data) {
+      setProducts(ps => ps.map(p => p.id === productId ? { ...p, stock: data as StockLevel } : p))
+    }
+    setWareneingangBusy(false)
+    setWareneingangFor(null)
+    setWareneingangQty('')
+  }
+
   const inp = (field: keyof typeof form, placeholder: string, type = 'text') => (
     <input type={type} value={form[field]} placeholder={placeholder}
       onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
@@ -220,6 +279,78 @@ export default function LagerClient({ products: initialProducts, suppliers, acco
   )
 
   const orderTotal = toOrder.reduce((s, p) => s + (orderQty[p.id] ?? 0) * p.ek, 0)
+
+  // ── Bestellung als PDF (Browser-Print, keine externe Dependency) ──
+  function exportOrderAsPdf() {
+    const today = new Date().toLocaleDateString('de-AT', { day: '2-digit', month: 'long', year: 'numeric' })
+    const grouped = new Map<string, typeof toOrder>()
+    for (const p of toOrder) {
+      const key = p.supplier?.name ?? 'Kein Lieferant'
+      grouped.set(key, [...(grouped.get(key) ?? []), p])
+    }
+
+    let grandTotal = 0
+    let tablesHtml = ''
+    for (const [supplierName, items] of grouped.entries()) {
+      let subtotal = 0
+      const rows = items.map(p => {
+        const menge = orderQty[p.id] ?? 0
+        const gesamt = menge * p.ek
+        subtotal += gesamt
+        return `<tr>
+          <td>${p.emoji ?? ''} ${p.name}</td>
+          <td style="text-align:center">${menge} ${p.einheit}</td>
+          <td style="text-align:right">€ ${p.ek.toFixed(2)}</td>
+          <td style="text-align:right;font-weight:700">€ ${gesamt.toFixed(2)}</td>
+        </tr>`
+      }).join('')
+      grandTotal += subtotal
+      tablesHtml += `
+        <div style="margin-bottom:20px;page-break-inside:avoid">
+          <div style="background:#0d1b3e;color:#fff;padding:7px 12px;font-size:11px;border-radius:4px 4px 0 0"><strong>${supplierName}</strong></div>
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr style="background:#e8edf5">
+              <th style="padding:8px 10px;font-size:10px;text-align:left">Produkt</th>
+              <th style="padding:8px 10px;font-size:10px;text-align:center">Menge</th>
+              <th style="padding:8px 10px;font-size:10px;text-align:right">EK/Stk</th>
+              <th style="padding:8px 10px;font-size:10px;text-align:right">Gesamt</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+            <tfoot><tr>
+              <td colspan="3" style="text-align:right;padding:8px 10px;font-size:11px;color:#666">Subtotal ${supplierName}</td>
+              <td style="text-align:right;padding:8px 10px;font-size:11px;font-weight:800">€ ${subtotal.toFixed(2)}</td>
+            </tr></tfoot>
+          </table>
+        </div>`
+    }
+
+    const html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Bestellung – ${today}</title>
+      <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: -apple-system, Arial, sans-serif; font-size:12px; color:#1a1a2e; padding:20mm; }
+        td { padding:8px 10px; border-bottom:1px solid #e8e8f0; }
+        .total-box { margin-top:20px; background:#0d1b3e; color:#fff; padding:14px 18px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; }
+        .total-value { font-size:22px; font-weight:900; color:#4fc3f7; }
+        @media print { body { padding:10mm 15mm; } @page { margin:10mm; } }
+      </style></head>
+      <body>
+        <h1 style="font-size:20px;margin-bottom:4px">Bestellung — ${today}</h1>
+        ${tablesHtml}
+        <div class="total-box">
+          <span>Gesamtbetrag</span>
+          <span class="total-value">€ ${grandTotal.toFixed(2)}</span>
+        </div>
+        <div style="margin-top:20px;font-size:9px;color:#aaa;text-align:center;border-top:1px solid #eee;padding-top:12px">
+          Erstellt mit VendoAI
+        </div>
+        <script>window.onload = function() { window.print(); }</script>
+      </body></html>`
+
+    const w = window.open('', '_blank', 'width=900,height=700')
+    if (!w) { alert('Popup blockiert — bitte Popups für diese Seite erlauben.'); return }
+    w.document.write(html)
+    w.document.close()
+  }
 
   return (
     <div style={{ padding: '40px 44px', maxWidth: '1300px' }}>
@@ -263,7 +394,13 @@ export default function LagerClient({ products: initialProducts, suppliers, acco
         <KpiCard label="Produkte" value={String(products.length)} sub={`${withStock.length} mit Bestand erfasst`} color="var(--teal)" icon={<Package size={14} />} />
         <KpiCard label="Lagerwert (EK)" value={fmtEur(lagerwert)} sub="aktueller Lagerbestand × EK" color="var(--label)" icon={<Boxes size={14} />} />
         <KpiCard label="Nachbestellen" value={String(toOrder.length)} sub={`${lowStock.length} weitere niedrig`} color={toOrder.length > 0 ? 'var(--red)' : 'var(--green)'} icon={<AlertTriangle size={14} />} />
-        <KpiCard label="Ø Marge" value={`${avgMarge.toFixed(1)}%`} sub="über alle Produkte" color="var(--green)" icon={<TrendingUp size={14} />} />
+        <KpiCard
+          label="Totes Kapital"
+          value={fmtEur(toteKapitalWert)}
+          sub={`${toteKapitalProdukte.length} Produkte ohne Bewegung >30 Tage`}
+          color={toteKapitalWert > 0 ? 'var(--red)' : 'var(--green)'}
+          icon={<TrendingUp size={14} />}
+        />
       </div>
 
       {/* ── KI Nachbestellung Panel ── */}
@@ -311,7 +448,16 @@ export default function LagerClient({ products: initialProducts, suppliers, acco
           </div>
           <div style={{ padding: '12px 18px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--s1)' }}>
             <span style={{ fontSize: '12px', color: 'var(--muted)' }}>Bestellwert gesamt</span>
-            <span style={{ fontSize: '18px', fontWeight: 900, color: 'var(--teal)' }}>{fmtEur(orderTotal)}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <button onClick={exportOrderAsPdf} style={{
+                display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 12px',
+                borderRadius: '8px', border: '1px solid var(--border)', cursor: 'pointer',
+                background: 'var(--s3)', color: 'var(--label)', fontSize: '12px', fontWeight: 700,
+              }}>
+                <FileDown size={13} /> Bestellung als PDF
+              </button>
+              <span style={{ fontSize: '18px', fontWeight: 900, color: 'var(--teal)' }}>{fmtEur(orderTotal)}</span>
+            </div>
           </div>
         </div>
       )}
@@ -343,7 +489,7 @@ export default function LagerClient({ products: initialProducts, suppliers, acco
       {/* ── Table ── */}
       <div style={{ background: 'var(--s2)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
         {/* Header */}
-        <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 130px 110px 80px 100px 110px 80px', padding: '0 16px', borderBottom: '1px solid var(--border)', background: 'var(--s1)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 130px 110px 80px 100px 110px 108px', padding: '0 16px', borderBottom: '1px solid var(--border)', background: 'var(--s1)' }}>
           {[
             { label: '',          key: null },
             { label: 'Produkt',   key: 'name' as SortKey },
@@ -382,7 +528,7 @@ export default function LagerClient({ products: initialProducts, suppliers, acco
 
           return (
             <div key={p.id} style={{
-              display: 'grid', gridTemplateColumns: '44px 1fr 130px 110px 80px 100px 110px 80px',
+              display: 'grid', gridTemplateColumns: '44px 1fr 130px 110px 80px 100px 110px 108px',
               padding: '0 16px',
               borderBottom: i < filtered.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
               background: st === 'order' ? 'rgba(248,113,113,0.02)' : 'transparent',
@@ -474,6 +620,11 @@ export default function LagerClient({ products: initialProducts, suppliers, acco
 
               {/* Actions */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '14px 0' }}>
+                <button onClick={() => { setWareneingangFor(p.id); setWareneingangQty('') }} title="Wareneingang buchen" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '5px', borderRadius: '6px', display: 'flex', transition: 'color .15s' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--green)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--muted)'}>
+                  <PackagePlus size={14} />
+                </button>
                 <button onClick={() => openEdit(p)} title="Bearbeiten" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '5px', borderRadius: '6px', display: 'flex', transition: 'color .15s' }}
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--teal)'}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--muted)'}>
@@ -490,6 +641,45 @@ export default function LagerClient({ products: initialProducts, suppliers, acco
         })}
       </div>
 
+      {/* ── Totes Kapital Sektion ── */}
+      {toteKapitalProdukte.length > 0 && (
+        <div style={{ marginTop: '20px', background: 'var(--s2)', border: '1px solid rgba(248,113,113,0.22)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', background: 'rgba(248,113,113,0.04)' }}>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--red)' }}>⚠️ Totes Kapital</div>
+            <div style={{ fontSize: '11px', color: 'var(--muted)' }}>Produkte ohne Bewegung seit über 30 Tagen — bindet Kapital ohne Umschlag</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 140px 120px 1fr', padding: '0 20px', borderBottom: '1px solid var(--border)' }}>
+            {['Produkt', 'Menge', 'Tage ohne Bewegung', 'Gebundener Wert', 'KI-Tipp'].map((h, i) => (
+              <div key={i} style={{ padding: '10px 0', fontSize: '10px', fontWeight: 700, letterSpacing: '.5px', color: 'var(--muted)' }}>{h}</div>
+            ))}
+          </div>
+          {toteKapitalProdukte.map((p, i) => {
+            const menge = p.stock?.current_qty ?? 0
+            const days = p.stock?.letzte_bewegung
+              ? Math.floor((Date.now() - new Date(p.stock.letzte_bewegung).getTime()) / (24 * 60 * 60 * 1000))
+              : null
+            const wert = menge * p.ek
+            const tipp = menge > 50 ? 'Rabatt empfehlen oder Standortwechsel prüfen' : 'In anderen Automaten testen'
+            return (
+              <div key={p.id} style={{
+                display: 'grid', gridTemplateColumns: '1fr 90px 140px 120px 1fr', padding: '0 20px',
+                borderBottom: i < toteKapitalProdukte.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+              }}>
+                <div style={{ padding: '12px 0', fontSize: '13px', fontWeight: 600 }}>{p.emoji ?? '📦'} {p.name}</div>
+                <div style={{ padding: '12px 0', fontSize: '13px', display: 'flex', alignItems: 'center' }}>{menge}</div>
+                <div style={{ padding: '12px 0', fontSize: '13px', display: 'flex', alignItems: 'center', color: 'var(--red)' }}>
+                  {days !== null ? `${days} Tage` : 'nie erfasst'}
+                </div>
+                <div style={{ padding: '12px 0', fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center' }}>{fmtEur(wert)}</div>
+                <div style={{ padding: '12px 0', fontSize: '12px', color: 'var(--teal)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Brain size={12} /> {tipp}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* Hinweis wenn kein Verbrauch eingetragen */}
       {withStock.length > 0 && products.every(p => !p.stock?.avg_monthly_consumption) && (
         <div style={{ marginTop: '16px', padding: '14px 18px', background: 'rgba(56,189,248,0.05)', border: '1px solid rgba(56,189,248,0.15)', borderRadius: 'var(--r-sm)', display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -499,6 +689,46 @@ export default function LagerClient({ products: initialProducts, suppliers, acco
           </div>
         </div>
       )}
+
+      {/* ── Wareneingang Modal ── */}
+      {wareneingangFor && (() => {
+        const p = products.find(pr => pr.id === wareneingangFor)
+        if (!p) return null
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(5,8,22,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={e => e.target === e.currentTarget && setWareneingangFor(null)}>
+            <div style={{ width: '340px', background: 'var(--s1)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '22px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: '15px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <PackagePlus size={17} color="var(--green)" /> Wareneingang
+                </div>
+                <button onClick={() => setWareneingangFor(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '4px' }}><X size={16} /></button>
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--muted)' }}>{p.emoji ?? '📦'} {p.name}</div>
+              <div>
+                <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '.7px', color: 'var(--muted)', marginBottom: '6px' }}>STÜCK ERHALTEN</div>
+                <input
+                  autoFocus
+                  type="number"
+                  min={1}
+                  value={wareneingangQty}
+                  onChange={e => setWareneingangQty(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') bookWareneingang(p.id) }}
+                  placeholder="z.B. 120"
+                  style={{ width: '100%', background: 'var(--s3)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '16px', fontWeight: 700, padding: '10px 12px', outline: 'none', textAlign: 'center' }}
+                />
+              </div>
+              <button
+                onClick={() => bookWareneingang(p.id)}
+                disabled={wareneingangBusy || !parseInt(wareneingangQty)}
+                style={{ padding: '11px', borderRadius: '10px', border: 'none', cursor: 'pointer', background: 'var(--green)', color: '#0a1628', fontWeight: 800, fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: wareneingangBusy || !parseInt(wareneingangQty) ? 0.6 : 1 }}
+              >
+                <Check size={16} /> {wareneingangBusy ? 'Buchen…' : 'Buchen'}
+              </button>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Add/Edit Form Panel ── */}
       {showForm && (
@@ -531,6 +761,7 @@ export default function LagerClient({ products: initialProducts, suppliers, acco
               </FormField>
               <FormField label="MINDESTBESTAND">{inp('mindestbestand', '10', 'number')}</FormField>
             </div>
+            <FormField label="Ø VERBRAUCH/MONAT (STK)">{inp('avg_monthly_consumption', '30', 'number')}</FormField>
             <FormField label="LIEFERANT">
               <select value={form.supplier_id} onChange={e => setForm(f => ({ ...f, supplier_id: e.target.value }))}
                 style={{ width: '100%', background: 'var(--s3)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', fontSize: '13px', padding: '8px 12px', outline: 'none' }}>
