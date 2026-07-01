@@ -11,6 +11,7 @@ import {
   type AIInsight,
 } from '@/lib/calculations'
 import MachineCard from '@/components/MachineCard'
+import LagerKPISection from '@/components/LagerKPISection'
 import CSVImport from '@/components/CSVImport'
 import SnapshotModal from '@/components/SnapshotModal'
 import ChartsSection from '@/components/ChartsSection'
@@ -22,12 +23,19 @@ import {
 
 type Filter = 'all' | 'g' | 'y' | 'r'
 
+interface LagerKPIs {
+  lagerwert: number
+  totesKapital: number
+  baldLeer: number
+}
+
 interface Props {
   machines: Machine[]
   snapshots: Snapshot[]
   settings: FleetSettings
   accountId: string
   fullName: string
+  lagerKPIs?: LagerKPIs | null
 }
 
 function greeting(name: string) {
@@ -54,7 +62,7 @@ const TYPE_STYLE = {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function DashboardClient({ machines, snapshots, settings, accountId, fullName }: Props) {
+export default function DashboardClient({ machines, snapshots, settings, accountId, fullName, lagerKPIs }: Props) {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const [filter,       setFilter]       = useState<Filter>('all')
@@ -323,7 +331,14 @@ export default function DashboardClient({ machines, snapshots, settings, account
         </div>
       </div>
 
-      {/* ── 4. CHARTS ────────────────────────────────────────────────────── */}
+      {/* ── 4. LAGER KPIs ────────────────────────────────────────────────── */}
+      {lagerKPIs && (
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <LagerKPISection kpis={lagerKPIs} />
+        </div>
+      )}
+
+      {/* ── 5. CHARTS ────────────────────────────────────────────────────── */}
       <div style={{ marginBottom: '32px', position: 'relative', zIndex: 1 }}>
         <SectionLabel text="ANALYTICS" />
         <ChartsSection machines={machines} snapshots={snapshots} settings={settings} />
@@ -613,7 +628,11 @@ function SectionLabel({ text, count }: { text: string; count?: number }) {
 
 function TrendBadge({ pct }: { pct: number | null }) {
   if (pct === null) return null
-  const up  = pct >= 0
+  // Unter 0.5% Differenz = kein aussagekräftiger Trend (z.B. Snapshot = aktuelle Baseline)
+  if (Math.abs(pct) < 0.005) return (
+    <span style={{ fontSize: '11px', color: 'var(--muted)' }}>— kein Vormonat</span>
+  )
+  const up  = pct > 0
   const abs = Math.abs(pct * 100).toFixed(1)
   return (
     <span style={{

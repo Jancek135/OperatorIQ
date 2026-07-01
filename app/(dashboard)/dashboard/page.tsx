@@ -18,7 +18,7 @@ export default async function DashboardPage() {
   const accountId = profile.account_id
   const fullName  = profile.full_name ?? user.email ?? ''
 
-  const [machinesRes, costsRes, weRes, overridesRes, snapshotsRes, settingsRes, locationsRes] = await Promise.all([
+  const [machinesRes, costsRes, weRes, overridesRes, snapshotsRes, settingsRes, locationsRes, stockRes, catalogRes] = await Promise.all([
     supabase.from('machines').select('*').eq('account_id', accountId).order('sort_order'),
     supabase.from('machine_costs').select('*'),
     supabase.from('we_overrides').select('*'),
@@ -26,6 +26,8 @@ export default async function DashboardPage() {
     supabase.from('snapshots').select('*').eq('account_id', accountId),
     supabase.from('fleet_settings').select('*').eq('account_id', accountId).single(),
     supabase.from('locations').select('*').eq('account_id', accountId),
+    supabase.from('stock_levels').select('product_id, current_qty, mindestbestand, letzte_bewegung').eq('account_id', accountId),
+    supabase.from('catalog_products').select('id, ek_preis: ek').eq('account_id', accountId),
   ])
 
   const rawMachines = machinesRes.data ?? []
@@ -46,9 +48,22 @@ export default async function DashboardPage() {
 
   const snapshots: Snapshot[] = snapshotsRes.data ?? []
 
+  // Lager KPIs
+  const stockItems = stockRes.data ?? []
+  const catalogMap = new Map((catalogRes.data ?? []).map((p: { id: string; ek_preis: number }) => [p.id, p.ek_preis]))
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+  const lagerKPIs = stockItems.length > 0 ? {
+    lagerwert: stockItems.reduce((sum, s) => sum + s.current_qty * (catalogMap.get(s.product_id) ?? 0), 0),
+    totesKapital: stockItems
+      .filter(s => s.letzte_bewegung && s.letzte_bewegung < thirtyDaysAgo)
+      .reduce((sum, s) => sum + s.current_qty * (catalogMap.get(s.product_id) ?? 0), 0),
+    baldLeer: stockItems.filter(s => s.mindestbestand != null && s.current_qty <= s.mindestbestand).length,
+  } : null
+
   const settings: FleetSettings = settingsRes.data
-    ? { we_rate: settingsRes.data.we_rate, total_fix: settingsRes.data.total_fix, variable_costs: settingsRes.data.variable_costs }
-    : { we_rate: 0.27, total_fix: 0, variable_costs: 0 }
+    ? { we_rate: settingsRes.data.we_rate, total_fix: settingsRes.data.total_fix, variable_costs: settingsRes.data.variable_costs, revenue_items: settingsRes.data.revenue_items ?? [] }
+    : { we_rate: 0.27, total_fix: 0, variable_costs: 0, revenue_items: [] }
 
   return (
     <DashboardClient
@@ -57,6 +72,7 @@ export default async function DashboardPage() {
       settings={settings}
       accountId={accountId}
       fullName={fullName}
+      lagerKPIs={lagerKPIs}
     />
   )
 }
