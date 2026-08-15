@@ -43,7 +43,7 @@ Execution       → Bestellungen vorbereiten, PDFs, Aufgaben
 **Supabase URLs:**
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://bdlokeizgaylgtcwgdfw.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkbG9rZWl6Z2F5bGd0Y3dnZGZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDg4MDUsImV4cCI6MjA5NzM4NDgwNX0.pGc__bA6ugxcmm7sMtwcFt2u63vLnIb2Ytml4w0SHnE
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<siehe Vercel → Settings → Environment Variables>
 ```
 
 **Supabase Clients:**
